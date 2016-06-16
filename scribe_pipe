@@ -38,20 +38,21 @@ def load_datetime(value, format):
 
 def dump_datetime(value, format):
     return value.strftime(format)
-
-parser = NginxLogParser('$request_time $remote_addr $sent_http_x_cache [$time_local] ' + \
+#vnpt-hni-14 - - [meta sequenceId="49552677"] nginx:
+#parser = NginxLogParser('$request_time $remote_addr $sent_http_x_cache [$time_local] ' + \
+parser = NginxLogParser('$remote_host - - [$seq_id] nginx: $request_time $remote_addr $sent_http_x_cache [$time_local] ' + \
 			'"$request" $http_host $status $body_bytes_sent ' + \
 			'"$http_referer" "$http_user_agent" "$http_range"')
 import redis
 #rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
 
-NTIME = 3
+NTIME = 10
 #GLOBALLOCK = multiprocessing.Lock()
 
-num_worker_process = 128
-num_worker_main = 12
+num_worker_process = 4
+num_worker_main = 4
 # t_timeout = 10
-tcount = 10000
+tcount = 5000
 tqueue = []
 
 def check_time1(atime):
@@ -81,7 +82,7 @@ def flush_queue():
         tqueue[:] = []
         #GLOBALLOCK.release()
     else:
-        logging.info("flush: onrotate")
+        #logging.info("flush: onrotate")
         tqueue[:] = []
 
 import uuid
@@ -105,7 +106,7 @@ def worker(myqueue):
             ut = int(time.mktime(cur.timetuple()))
 
             if not check_time(tqueue1):
-                logging.info("flush: onprocess")
+                #logging.info("flush: onprocess")
                 continue
 
             send = False
@@ -120,7 +121,7 @@ def worker(myqueue):
                 else:
                     cache_val[kk] = float(tval['val'])
             if send:
-                logging.info("send:%s:%d" % (id, len(cache_val)))
+               # logging.info("send:%s:%d" % (id, len(cache_val)))
                 pp = rd.pipeline()
                 for kk in cache_val:
                     vv = float(cache_val[kk])
@@ -146,6 +147,8 @@ def workerMain(mainQueue):
             pp = parser.parse_line(message)
             if not pp:
                 continue
+            #logging.info(pp)
+            rhost = pp["remote_host"]
             if pp['http_host']:
                 cat = pp['http_host']
             else:
@@ -160,21 +163,32 @@ def workerMain(mainQueue):
             cur5 = cur.replace(minute=min5)
             localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
             if not check_time1(localtime5):
-                logging.info("flush: onreal:%s" % localtime5)
+#                logging.info("flush: onreal:%s" % localtime5)
                 continue
 
+            tqueue.append({
+                "type": "rhost_request_count_%s|%s" % (str(pp["status"]), str(rhost)),
+                "name":localtime5,
+                "val":1})
             tqueue.append({
                 "type": "request_count_%s|%s" % (str(pp["status"]), str(cat)),
                 "name":localtime5,
                 "val":1})
             if pp['status'] == '200' or  pp['status'] == '206':
+                tqueue.append({"type": "rhost_body_bytes_sent" + "|"  + rhost, "name": localtime5, "val":pp["body_bytes_sent"]})
                 tqueue.append({"type": "body_bytes_sent" + "|"  + cat , "name": localtime5, "val":pp["body_bytes_sent"]})
+                tqueue.append({"type": "rhost_request_time" + "|"  + rhost, "name":localtime5, "val":pp["request_time"]})
                 tqueue.append({"type": "request_time" + "|"  + cat , "name":localtime5, "val":pp["request_time"]})
 
 
                 if float(pp["request_time"]) > 0.0000001:
                     speed_request = float(pp["body_bytes_sent"]) / float(pp["request_time"])
                     tqueue.append({"type": "speed_request" + "|"  + cat , "name": localtime5, "val": speed_request})
+                    tqueue.append({"type": "rhost_speed_request" + "|"  + rhost, "name": localtime5, "val": speed_request})
+                    tqueue.append({
+                        "type": "rhost_request_count_2xx|%s" % str(rhost),
+                        "name":localtime5,
+                        "val":1})
                     tqueue.append({
                         "type": "request_count_2xx|%s" % str(cat),
                         "name":localtime5,
@@ -199,11 +213,14 @@ def workerMain(mainQueue):
 the_pool = multiprocessing.Pool(num_worker_process, worker,(the_queue,))
 mainPool = multiprocessing.Pool(num_worker_main, workerMain,(mainQueue,))
 
+
+
 while True:
     try:
         message = sys.stdin.readline()
         if not message:
             continue
+	#logging.info(message)
         mainQueue.put(message)
     except Exception, err:
         logging.info(err)

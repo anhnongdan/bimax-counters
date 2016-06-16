@@ -1,0 +1,165 @@
+#!/bin/sh
+log=/tmp/aa.log
+ohn=`date +'%Y%m%d%H' --date='10 minutes ago'`
+omn=`date +%M --date='10 minutes ago'`
+omn5="`echo $omn - ${omn}%5 | bc`"
+if [ $omn5 -lt 10 ];then
+        omn5=0$omn5
+fi
+omin="${ohn}${omn5}+0700"
+hn=`date +'%Y%m%d%H' --date='5 minutes ago'`
+mn=`date +%M --date='5 minutes ago'`
+mn5="`echo $mn - ${mn}%5 | bc`"
+if [ $mn5 -lt 10 ];then
+        mn5=0$mn5
+fi
+min="${hn}${mn5}+0700"
+svrs="xmiolive.e14538a7.viettel-cdn.vn vod1.clipzone.vn"
+redis="/usr/bin/redis-cli -s /tmp/redis.sock -n 0"
+keys(){
+	h=$1
+	t=$2
+	c=$3
+	echo "keys 'rhost_${c}_${t}*|${h}'" | $redis
+}
+vals(){
+	k=$1
+	t=$2
+	v="`echo "hget rhost_$k 5:${t}" | $redis`"
+	if [ -z $v ];then
+		v=0
+	fi
+	echo $v
+}
+cXXX(){
+    s2=0
+    svrs="$1"
+    c="$2"
+    if [ $# -ge 3 ];then
+    	p="$3"
+    else
+	p=""
+    fi
+    t=""
+    if [ $# -ge 4 ];then
+    	t="$4"
+    fi
+    if [ -z "$t" ];then 
+	t="$min"
+    fi
+#    echo "$t" >> $log
+    for svr in $svrs;do
+	if [ -z "$p" ];then
+		ss="${c}|${svr}" 	
+		v=`vals $ss $t`	
+		s2=`echo $v + $s2 | bc`
+	else
+		for ss in `keys $svr $p $c`;do
+			v=`vals $ss $t`	
+			s2=`expr $v + $s2`
+		done	
+	fi	
+    done
+    echo "$s2"
+}
+div(){
+	a=$1
+	b=$2
+	if [ \( -z "$a" \) -o \( -z "$b" \) -o \( "$b" = "0" \) ];then
+		echo 0
+	else
+		echo $a $b | awk '{printf("%.f",$1/$2)}'
+	
+	fi
+}
+NW2XX=1000
+NC2XX=2000
+pr(){
+st=0
+msg=""
+host="$1"
+svrs="$2"
+if [ -z "$svrs" ];then
+	svrs="$host"
+fi
+#echo -n "0 hh_${host} "
+qt=`cXXX "$svrs" "request_time" | cut -d'.' -f1`
+s=""
+vdrop2xx=0
+outmsg=""
+if [ "$qt" = "0" ];then 
+	for c in 2 3 4 5;do 
+		s="${s}req_${c}xx_ps=0|"
+			done
+			s="${s}avg_speed=0|"
+			s="${s}traffic_5min=0|"
+			s="${s}traffic_ps=0 "
+			n2xx=0
+
+else
+	c=2
+		n2xx="`cXXX "$svrs" "request_count" "$c" ""`"
+		outmsg="$outmsg [2xx=`div $n2xx 300`]"
+		nn2xx="`cXXX "$svrs" "request_count_2xx" "" ""`"
+		onn2xx="`cXXX "$svrs" "request_count_2xx" "" "$omin"`"
+#	echo cXXX "$svrs" "request_count_2xx" "" "$omin" >> $log
+		#drop2xx=`echo $nn2xx - $onn2xx | bc`
+		drop2xx=`echo "( $nn2xx - $onn2xx ) / 300" | bc`
+		vdrop2xx=$drop2xx
+		if [ $vdrop2xx -lt 0 ];then
+			vdrop2xx=`echo - $drop2xx | bc`
+		fi
+        #echo "$svrs $drop2xx1" >> $log
+        #vdrop2xx1=`div $vdrop2xx 300`
+	if [ $vdrop2xx -gt $NC2XX ] ;then
+		st=2
+	elif [ $vdrop2xx -gt $NW2XX ] ;then
+		st=1
+	fi
+	msg="$msg change_2xx: $drop2xx rq/s"
+#        echo "$svrs $omin:$onn2xx $min:$nn2xx drop:$drop2xx1 msg:$msg" >> $log
+    	s="${s}req_${c}xx_ps=`div $n2xx 300`|"
+	for c in 3 4 5;do 
+		vv="`cXXX "$svrs" "request_count" "$c" ""`"
+    		s="${s}req_${c}xx_ps=`div $vv 300`|"
+	done
+
+	sp=`cXXX "$svrs" "speed_request" "" ""`
+	if [ $n2xx -eq 0 ];then
+		asp=0
+	else
+		asp=`div $sp $nn2xx`
+	fi
+	s="${s}avg_speed=${asp}|"
+
+	ban=`cXXX "$svrs" "body_bytes_sent" "" ""`
+
+	traffic_ps=`div $ban 300`
+	outmsg="$outmsg [bw=`echo $traffic_ps*8/1024/1024 | bc` Mbps]"
+        s="${s}change_2xx=${drop2xx};$NW2XX;$NC2XX;|"
+	outmsg="$outmsg [ch2xx=$drop2xx]"
+        s="${s}traffic_5min=`echo ${ban}*8 | bc`|"
+        s="${s}traffic_ps=`echo ${traffic_ps}*8 | bc` "
+
+fi
+p1="$st rh_${host} "
+echo "$p1 $s $outmsg"
+if [ -n "$3" ];then
+	p1="0 ${3}_${host} "
+	echo "$p1 $s $outmsg"
+	#echo "$p1 $s Monitor $host: 2xx_cur:$n2xx $msg"
+fi
+}
+
+echo "keys rhost_request_count_200|*" | $redis  | awk -F'|' '{print $2}' | awk '!/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/' | awk '!/\:/' |  while read host;do
+	if [ \( "$host" = '-' \) -o \( "$host" = "" \) ];then
+		continue
+	fi
+	if [ \( $host = 'live.csmtalk.vcdn.vn' \) -o \( $host = 'stream1.tv.zdn.vn' \) -o \( $host = 'stream14.tv.zdn.vn' \) ];then
+		pr "$host" "" "cdn_vng"
+	else
+		pr "$host" ""
+	fi
+
+done
+
