@@ -49,8 +49,8 @@ import redis
 NTIME = 10
 #GLOBALLOCK = multiprocessing.Lock()
 
-num_worker_process = 4
-num_worker_main = 4
+num_worker_process = 128
+num_worker_main = 32
 # t_timeout = 10
 tcount = 5000
 tqueue = []
