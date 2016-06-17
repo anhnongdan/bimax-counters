@@ -1,10 +1,6 @@
 #!/usr/bin/python
-#import multiprocessing
 import os
 import time
-
-#the_queue = multiprocessing.Queue()
-#mainQueue = multiprocessing.Queue()
 
 from threading import Thread
 from Queue import Queue
@@ -48,92 +44,8 @@ import redis
 rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
 
 NTIME = 3
-#GLOBALLOCK = multiprocessing.Lock()
 
-num_worker_process = 4
-num_worker_main = 4
-# t_timeout = 10
-tcount = 50000
-#tqueue = []
-
-def check_time1(atime):
-    cur = datetime.now()
-    min5 = cur.minute - (cur.minute % 5);
-    cur5 = cur.replace(minute=min5)
-    nn = cur5.strftime("5:%Y%m%d%H%M%z+0700")
-
-    if atime != nn:
-        return False
-    return True
-
-def check_time(tqueue1):
-    cur = datetime.now()
-    min5 = cur.minute - (cur.minute % 5);
-    cur5 = cur.replace(minute=min5)
-    nn = cur5.strftime("5:%Y%m%d%H%M%z+0700")
-    tt = tqueue1[0]
-    if tt['name'] != nn:
-        return False
-    return True
-
-def flush_queue():
-    if len(tqueue) > 0 and check_time(tqueue):
-        #GLOBALLOCK.acquire()
-        the_queue.put(tqueue[:])
-        tqueue[:] = []
-        #GLOBALLOCK.release()
-    else:
-        #logging.info("flush: onrotate")
-        tqueue[:] = []
-
-import uuid
-
-def worker(myqueue):
-    id=uuid.uuid4()
-
-    cache_val = {}
-    logging.info("process start:%s" % id)
-    rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
-    tqueue1 = []
-    oldut = 0
-    while True:
-        try:
-            tqueue1 = myqueue.get()
-            n = len(tqueue1)
-            if n == 0:
-                continue
-            ss = len(tqueue1)
-            cur = datetime.now()
-            ut = int(time.mktime(cur.timetuple()))
-
-            if not check_time(tqueue1):
-                #logging.info("flush: onprocess")
-                continue
-
-            send = False
-            if ut - oldut > NTIME:
-                oldut = ut
-                send = True
-
-            for tval in tqueue1:
-                kk = "%s###%s" %(tval['type'], tval['name'])
-                if kk in cache_val:
-                    cache_val[kk] = cache_val[kk] + float(tval['val'])
-                else:
-                    cache_val[kk] = float(tval['val'])
-            if send:
-               # logging.info("send:%s:%d" % (id, len(cache_val)))
-                pp = rd.pipeline()
-                for kk in cache_val:
-                    vv = float(cache_val[kk])
-                    type,name = kk.split("###")
-                    pp.hincrbyfloat(type, name, vv)
-                pp.execute()
-                cache_val = {}
-        except Exception, err:
-            logging.info(err)
-            continue
-
+TCOUNT = 50000
 
 def do_flush(cache_val):
     pp = rd.pipeline()
@@ -185,9 +97,6 @@ def workerMain(id, mainQueue):
             min5 = cur.minute - (cur.minute % 5);
             cur5 = cur.replace(minute=min5)
             localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
-            if not check_time1(localtime5):
-#                logging.info("flush: onreal:%s" % localtime5)
-                continue
 
             tqueue.append({
                 "type": "rhost_request_count_%s|%s" % (str(pp["status"]), str(rhost)),
@@ -219,7 +128,7 @@ def workerMain(id, mainQueue):
 
             cur1 = datetime.now()
             utime1 = int(time.mktime(cur.timetuple()))
-            if (utime1 - utime) > NTIME or len(tqueue) >= tcount:
+            if (utime1 - utime) > NTIME or len(tqueue) >= TCOUNT:
                 logging.info("flush:%s" % len(tqueue))
                 utime = utime1
                 do_count(tqueue)
@@ -245,11 +154,6 @@ def create_thread(q_msg):
 
 for i in range(NPIPE_INIT):
     create_thread(q_msg)
-
-
-
-#the_pool = multiprocessing.Pool(num_worker_process, worker,(the_queue,))
-#mainPool = multiprocessing.Pool(num_worker_main, workerMain,(mainQueue,))
 
 cur0 = datetime.now()
 utime0 = int(time.mktime(cur0.timetuple()))
