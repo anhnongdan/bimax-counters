@@ -41,13 +41,12 @@ parser = NginxLogParser('$remote_host - - [$seq_id] nginx: $request_time $remote
 			'"$http_referer" "$http_user_agent" "$http_range"')
 import redis
 
-rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
 
 NTIME = 3
 
-TCOUNT = 10
+TCOUNT = 100
 
-def do_flush(cache_val):
+def do_flush(rd, cache_val):
     pp = rd.pipeline()
     for kk in cache_val:
          vv = float(cache_val[kk])
@@ -55,7 +54,7 @@ def do_flush(cache_val):
          pp.hincrbyfloat(type, name, vv)
     pp.execute()
 
-def do_count(tqueue):
+def do_count(rd, tqueue):
     cache_val = {}
     for tval in tqueue:
         kk = "%s###%s" %(tval['type'], tval['name'])
@@ -63,10 +62,11 @@ def do_count(tqueue):
             cache_val[kk] = cache_val[kk] + float(tval['val'])
         else:
             cache_val[kk] = float(tval['val'])
-    do_flush(cache_val)
+    do_flush(rd, cache_val)
 
 
 def workerMain(id, mainQueue):
+    rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
     #id=uuid.uuid4()
     logging.info("worker:%s" % id)
     cur = datetime.now()
@@ -131,7 +131,7 @@ def workerMain(id, mainQueue):
             if (utime1 - utime) > NTIME or len(tqueue) >= TCOUNT:
                 #logging.info("flush:%s" % len(tqueue))
                 utime = utime1
-                do_count(tqueue)
+                do_count(rd,tqueue)
                 tqueue[:] = []
                 cache_val = {}
             #    logging.info("tqueue:%s" % len(tqueue))
@@ -142,7 +142,7 @@ def workerMain(id, mainQueue):
 
 
 q_msg = Queue()
-NPIPE_INIT=32
+NPIPE_INIT=1
 POOL = []
 def create_thread(q_msg):
     i = len(POOL) + 1
@@ -174,9 +174,9 @@ while True:
         utime1 = int(time.mktime(cur1.timetuple()))
         if utime1 - utime0 > 10:
             qs = q_msg.qsize()
-            if qs > 100:
+            if qs > 1000:
                 create_thread(q_msg)
-            logging.info(q_msg.qsize())
+            logging.info("qsize:%d nworker:%d" % (q_msg.qsize(), len(POOL)))
             cur0 = datetime.now()
             utime0 = int(time.mktime(cur0.timetuple()))
 
