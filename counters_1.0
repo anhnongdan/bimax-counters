@@ -45,7 +45,7 @@ rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
 
 NTIME = 3
 
-TCOUNT = 50000
+TCOUNT = 100
 
 def do_flush(cache_val):
     pp = rd.pipeline()
@@ -129,7 +129,7 @@ def workerMain(id, mainQueue):
             cur1 = datetime.now()
             utime1 = int(time.mktime(cur.timetuple()))
             if (utime1 - utime) > NTIME or len(tqueue) >= TCOUNT:
-                logging.info("flush:%s" % len(tqueue))
+                #logging.info("flush:%s" % len(tqueue))
                 utime = utime1
                 do_count(tqueue)
                 tqueue[:] = []
@@ -137,12 +137,12 @@ def workerMain(id, mainQueue):
             #    logging.info("tqueue:%s" % len(tqueue))
             #    logging.info("cache_val:%s" % len(cache_val))
         except Exception, err:
-            logging.info(err)
-            continue
+            #logging.info(err)
+            pass 
 
 
 q_msg = Queue()
-NPIPE_INIT=1
+NPIPE_INIT=4
 POOL = []
 def create_thread(q_msg):
     i = len(POOL) + 1
@@ -174,12 +174,12 @@ while True:
         utime1 = int(time.mktime(cur1.timetuple()))
         if utime1 - utime0 > 10:
             qs = q_msg.qsize()
-            if qs > 10000:
+            if qs > 1000:
                 create_thread(q_msg)
             logging.info(q_msg.qsize())
             cur0 = datetime.now()
             utime0 = int(time.mktime(cur0.timetuple()))
 
     except Exception, err:
-        logging.info(err)
+        #logging.info(err)
         pass
