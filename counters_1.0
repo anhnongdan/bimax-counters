@@ -45,13 +45,23 @@ import redis
 NTIME = 3
 
 TCOUNT = 100
+def check_time1(atime):
+    cur = datetime.now()
+    min5 = cur.minute - (cur.minute % 5);
+    cur5 = cur.replace(minute=min5)
+    nn = cur5.strftime("5:%Y%m%d%H%M%z+0700")
+
+    if atime != nn:
+        return False
+    return True
 
 def do_flush(rd, cache_val):
     pp = rd.pipeline()
     for kk in cache_val:
          vv = float(cache_val[kk])
          type,name = kk.split("###")
-         pp.hincrbyfloat(type, name, vv)
+         if check_time1(name):
+             pp.hincrbyfloat(type, name, vv)
     pp.execute()
 
 def do_count(rd, tqueue):
@@ -82,7 +92,6 @@ def workerMain(id, mainQueue):
             pp = parser.parse_line(message)
             if not pp:
                 continue
-            #logging.info(pp)
             rhost = pp["remote_host"]
             if pp['http_host']:
                 cat = pp['http_host']
@@ -97,6 +106,9 @@ def workerMain(id, mainQueue):
             min5 = cur.minute - (cur.minute % 5);
             cur5 = cur.replace(minute=min5)
             localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
+            if not check_time1(localtime5):
+                continue
+
 
             tqueue.append({
                 "type": "rhost_request_count_%s|%s" % (str(pp["status"]), str(rhost)),
@@ -129,15 +141,12 @@ def workerMain(id, mainQueue):
             cur1 = datetime.now()
             utime1 = int(time.mktime(cur.timetuple()))
             if (utime1 - utime) > NTIME or len(tqueue) >= TCOUNT:
-                #logging.info("flush:%s" % len(tqueue))
                 utime = utime1
                 do_count(rd,tqueue)
                 tqueue[:] = []
                 cache_val = {}
-            #    logging.info("tqueue:%s" % len(tqueue))
-            #    logging.info("cache_val:%s" % len(cache_val))
+            mainQueue.task_done()
         except Exception, err:
-            #logging.info(err)
             pass 
 
 
@@ -166,9 +175,7 @@ while True:
         if not message:
             continue
         message = message.replace('""', '"-"')
-	#logging.info(message)
         q_msg.put_nowait(message)
-        #mainQueue.put(message)
 
         cur1 = datetime.now()
         utime1 = int(time.mktime(cur1.timetuple()))
