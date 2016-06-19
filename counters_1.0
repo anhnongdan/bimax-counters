@@ -42,9 +42,6 @@ parser = NginxLogParser('$remote_host - - [$seq_id] nginx: $request_time $remote
 import redis
 
 
-NTIME = 3
-
-TCOUNT = 100
 
 q_msg = Queue()
 q_counter = Queue()
@@ -76,6 +73,18 @@ def do_count(cache_val, tqueue):
             cache_val[kk] = cache_val[kk] + float(tval['val'])
         else:
             cache_val[kk] = float(tval['val'])
+
+def do_count1(rd, tqueue):
+    cache_val = {}
+    for tval in tqueue:
+        kk = "%s###%s" %(tval['type'], tval['name'])
+        if kk in cache_val:
+            cache_val[kk] = cache_val[kk] + float(tval['val'])
+        else:
+            cache_val[kk] = float(tval['val'])
+    logging.info("short:%d" % len(cache_val))
+    do_flush(rd, cache_val)
+
 
 def workerFlush(id, mainQueue, otherQueue):
     rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
@@ -126,8 +135,10 @@ def workerCounter(id, mainQueue, otherQueue):
 
 
 
+#NTIME = 3
+#TCOUNT = 100
 def workerMain(id, mainQueue, otherQueue):
-    #rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
+    rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
     NTIME = 1
     logging.info("workerMain:%s" % id)
     cur = datetime.now()
@@ -141,7 +152,6 @@ def workerMain(id, mainQueue, otherQueue):
             #message = mainQueue.get_nowait()
             if not message:
                 continue
-            mainQueue.task_done()
             pp = parser.parse_line(message)
             if not pp:
                 continue
@@ -197,9 +207,12 @@ def workerMain(id, mainQueue, otherQueue):
                 utime = utime1
                 qtmp = tqueue[:]
                 tqueue[:] = []
+                #logging.info("main:flush:%d" % len(qtmp))
                 logging.info("main:flush:%d" % len(qtmp))
-                otherQueue.put(qtmp)
+		do_count1(rd, qtmp)
+                #otherQueue.put(qtmp)
             #logging.info("main len:%s" % len(tqueue))
+            mainQueue.task_done()
         except Exception, err:
             pass 
 
@@ -210,6 +223,7 @@ POOL_COUNTER = []
 POOL_COUNTER_INIT = 1
 POOL_FLUSH = []
 POOL_FLUSH_INIT = 1
+
 def create_thread(pool, func, q1, q2):
     i = len(pool) + 1
     t = Thread(target=func, name='q_msg_%d' % i,args=(i, q1, q2))
@@ -219,31 +233,32 @@ def create_thread(pool, func, q1, q2):
 
 for i in range(POOL_INIT):
     create_thread(POOL, workerMain, q_msg, q_counter)
-for i in range(POOL_COUNTER_INIT):
-    create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
-for i in range(POOL_FLUSH_INIT):
-    create_thread(POOL_FLUSH, workerFlush, q_flush, None)
+#for i in range(POOL_COUNTER_INIT):
+#    create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
+#for i in range(POOL_FLUSH_INIT):
+#    create_thread(POOL_FLUSH, workerFlush, q_flush, None)
 
 
-def check_counter(POOL, POOL_COUNTER, POOL_FLUSH, q_msg, q_counter, q_flush):
+def check_counter(POOL, q_msg ):
     while True:
-        time.sleep(10)
+        time.sleep(3)
         qs = q_msg.qsize()
-        qs1 = q_counter.qsize()
-        qs2 = q_flush.qsize()
-        if qs > 3:
-            create_thread(POOL, workerMain, q_msg, q_counter)
-        if qs1 > 3:
-           create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
-        if qs2 > 3:
-           create_thread(POOL_FLUSH, workerFlush, q_flush, None)
+#        qs1 = q_counter.qsize()
+#        qs2 = q_flush.qsize()
+#        if qs > 3:
+#            create_thread(POOL, workerMain, q_msg, q_counter)
+#        if qs1 > 3:
+#           create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
+#        if qs2 > 3:
+#           create_thread(POOL_FLUSH, workerFlush, q_flush, None)
 
         logging.info("qsize:%d nworker:%d" % (qs, len(POOL)))
-        logging.info("q_counter_size:%d nworker:%d" % (qs1, len(POOL_COUNTER)))
-        logging.info("q_flush_size:%d nworker:%d" % (qs2, len(POOL_FLUSH)))
+#        logging.info("q_counter_size:%d nworker:%d" % (qs1, len(POOL_COUNTER)))
+#        logging.info("q_flush_size:%d nworker:%d" % (qs2, len(POOL_FLUSH)))
+t = Thread(target=check_counter, name='' ,args=(POOL, q_msg ))
 #t = Thread(target=check_counter, name='' ,args=(POOL, POOL_COUNTER, POOL_FLUSH, q_msg, q_counter, q_flush))
-#t.daemon = True
-#t.start()
+t.daemon = True
+t.start()
 
 
 while True:
