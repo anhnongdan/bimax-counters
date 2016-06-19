@@ -26,12 +26,15 @@ keys(){
 vals(){
 	k=$1
 	t=$2
+	#echo $k >> $log
 #	echo "hget rhost_$k 5:${t}"  >> $log
 	echo "$k" |grep "request_count" > /dev/null
 	if [ $? -eq 0 ];then
-	v="`echo "hget $k 5:${t}" | $redis`"
+		v="`echo "hget $k 5:${t}" | $redis`"
+		echo "hget $k 5:${t}" >> $log
 	else
-	v="`echo "hget rhost_$k 5:${t}" | $redis`"
+		echo "hget rhost_$k 5:${t}" >> $log
+		v="`echo "hget rhost_$k 5:${t}" | $redis`"
 	fi
 	if [ -z $v ];then
 		v=0
@@ -107,8 +110,8 @@ else
 	c=2
 		n2xx="`cXXX "$svrs" "request_count" "$c" ""`"
 		outmsg="$outmsg [2xx=`div $n2xx 300`]"
-		nn2xx="`cXXX "$svrs" "request_count_2xx" "" ""`"
-		onn2xx="`cXXX "$svrs" "request_count_2xx" "" "$omin"`"
+		nn2xx="`cXXX "$svrs" "rhost_request_count_2xx" "" ""`"
+		onn2xx="`cXXX "$svrs" "rhost_request_count_2xx" "" "$omin"`"
 #	echo cXXX "$svrs" "request_count_2xx" "" "$omin" >> $log
 		#drop2xx=`echo $nn2xx - $onn2xx | bc`
 		drop2xx=`echo "( $nn2xx - $onn2xx ) / 300" | bc`
