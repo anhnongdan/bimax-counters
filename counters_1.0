@@ -137,7 +137,7 @@ def workerCounter(id, mainQueue, otherQueue):
 
 #NTIME = 3
 #TCOUNT = 100
-def workerMain(id, mainQueue, otherQueue):
+def workerMain(id, mainQueue):
     rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
     NTIME = 1
     logging.info("workerMain:%s" % id)
@@ -207,11 +207,8 @@ def workerMain(id, mainQueue, otherQueue):
                 utime = utime1
                 qtmp = tqueue[:]
                 tqueue[:] = []
-                #logging.info("main:flush:%d" % len(qtmp))
                 logging.info("main:flush:%d" % len(qtmp))
 		do_count1(rd, qtmp)
-                #otherQueue.put(qtmp)
-            #logging.info("main len:%s" % len(tqueue))
             mainQueue.task_done()
         except Exception, err:
             pass 
@@ -224,15 +221,16 @@ POOL_COUNTER_INIT = 1
 POOL_FLUSH = []
 POOL_FLUSH_INIT = 1
 
-def create_thread(pool, func, q1, q2):
+def create_thread(pool, func, q):
     i = len(pool) + 1
-    t = Thread(target=func, name='q_msg_%d' % i,args=(i, q1, q2))
+    t = Thread(target=func, name='q_msg_%d' % i,args=(i, q))
+    pool.append(t)
     t.daemon = True
     t.start()
     return t
 
 for i in range(POOL_INIT):
-    create_thread(POOL, workerMain, q_msg, q_counter)
+    create_thread(POOL, workerMain, q_msg )
 #for i in range(POOL_COUNTER_INIT):
 #    create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
 #for i in range(POOL_FLUSH_INIT):
@@ -246,7 +244,7 @@ def check_counter(POOL, q_msg ):
 #        qs1 = q_counter.qsize()
 #        qs2 = q_flush.qsize()
         if qs > 10:
-            create_thread(POOL, workerMain, q_msg, q_counter)
+            create_thread(POOL, workerMain, q_msg)
 #        if qs1 > 3:
 #           create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
 #        if qs2 > 3:
