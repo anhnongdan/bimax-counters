@@ -218,7 +218,7 @@ def workerMain(id, mainQueue, otherQueue):
 
 
 POOL = []
-POOL_INIT = 1
+POOL_INIT = 1 
 POOL_COUNTER = []
 POOL_COUNTER_INIT = 1
 POOL_FLUSH = []
@@ -245,8 +245,8 @@ def check_counter(POOL, q_msg ):
         qs = q_msg.qsize()
 #        qs1 = q_counter.qsize()
 #        qs2 = q_flush.qsize()
-#        if qs > 3:
-#            create_thread(POOL, workerMain, q_msg, q_counter)
+        if qs > 10:
+            create_thread(POOL, workerMain, q_msg, q_counter)
 #        if qs1 > 3:
 #           create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
 #        if qs2 > 3:
