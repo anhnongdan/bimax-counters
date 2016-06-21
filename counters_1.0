@@ -215,7 +215,7 @@ def workerMain(id, mainQueue):
 
 
 POOL = []
-POOL_INIT = 1 
+POOL_INIT = 32
 POOL_COUNTER = []
 POOL_COUNTER_INIT = 1
 POOL_FLUSH = []
