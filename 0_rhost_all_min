@@ -90,7 +90,7 @@ if [ "$qt" = "0" ];then
 		s="${s}req_${c}xx_ps=0|"
 			done
 			s="${s}avg_speed=0|"
-			s="${s}traffic_min=0|"
+#			s="${s}traffic_min=0|"
 			s="${s}traffic_ps=0 "
 			n2xx=0
 
@@ -136,7 +136,7 @@ else
 	outmsg="$outmsg [bw=`echo $traffic_ps*8/1024/1024 | bc` Mbps]"
         s="${s}change_2xx=${drop2xx};$NW2XX;$NC2XX;|"
 	outmsg="$outmsg [ch2xx=$drop2xx]"
-        s="${s}traffic_min=`echo ${ban}*8 | bc`|"
+#        s="${s}traffic_min=`echo ${ban}*8 | bc`|"
         s="${s}traffic_ps=`echo ${traffic_ps}*8 | bc` "
 
 fi
