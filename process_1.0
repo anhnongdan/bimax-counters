@@ -115,6 +115,7 @@ def process(tqueue, message):
                 "name":localtime5,
                 "val":1})
 
-with open("/data/logs/2016/06/23/track-2016-06-23-14-05-2.log", "r") as f:
-    for line in f:
-        print line
+if __name__ == "__main__":
+    with open("/data/logs/2016/06/23/track-2016-06-23-14-05-2.log", "r") as f:
+        for line in f:
+            print line
