@@ -1,5 +1,4 @@
 #!/usr/bin/python
-import multiprocessing
 import os
 import time
 
@@ -42,41 +41,27 @@ parser = NginxLogParser('$remote_host - - [$seq_id] nginx: $request_time $remote
 			'"$http_referer" "$http_user_agent" "$http_range"')
 import redis
 
+q_msg = Queue()
+q_redis_msg = Queue()
+NPIPE_INIT=1
+NPIPE_INIT_REDIS=1
+POOL = []
+POOL_REDIS = []
 
+NTIME = 3
 
-#q_msg = Queue()
-q_msg = multiprocessing.Queue()
-#q_counter = Queue()
-#q_flush = Queue()
-
-def check_time1(atime):
-    cur = datetime.now()
-    min5 = cur.minute - (cur.minute % 5);
-    cur5 = cur.replace(minute=min5)
-    nn = cur5.strftime("5:%Y%m%d%H%M%z+0700")
-
-    if atime != nn:
-        return False
-    return True
+TCOUNT = 100
 
 def do_flush(rd, cache_val):
+    logging.info("flush %d" % len(cache_val))
     pp = rd.pipeline()
     for kk in cache_val:
          vv = float(cache_val[kk])
          type,name = kk.split("###")
-         if check_time1(name):
-             pp.hincrbyfloat(type, name, vv)
+         pp.hincrbyfloat(type, name, vv)
     pp.execute()
 
-def do_count(cache_val, tqueue):
-    for tval in tqueue:
-        kk = "%s###%s" %(tval['type'], tval['name'])
-        if kk in cache_val:
-            cache_val[kk] = cache_val[kk] + float(tval['val'])
-        else:
-            cache_val[kk] = float(tval['val'])
-
-def do_count1(rd, tqueue):
+def do_count(rd, tqueue):
     cache_val = {}
     for tval in tqueue:
         kk = "%s###%s" %(tval['type'], tval['name'])
@@ -84,79 +69,45 @@ def do_count1(rd, tqueue):
             cache_val[kk] = cache_val[kk] + float(tval['val'])
         else:
             cache_val[kk] = float(tval['val'])
-    logging.info("short:%d" % len(cache_val))
     do_flush(rd, cache_val)
 
 
-def workerFlush(id, mainQueue, otherQueue):
+def workerUpdateRedis(id, queue):
     rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
-    logging.info("workerFlush:%s" % id)
+    logging.info("workerRedis:%s" % id)
+
     while True:
         try:
-            #if mainQueue.empty():
-            #    continue
-            message = mainQueue.get()
-            #message = mainQueue.get_nowait()
+            if queue.empty():
+                continue
+            #message = queue.get()
+            message = queue.get_nowait()
             if not message:
                 continue
-            logging.info("flush:get:%d" % len(message))
-            mainQueue.task_done()
-            do_flush(rd, message)
-
-        except Exception, err:
-            pass
-
-def workerCounter(id, mainQueue, otherQueue):
-    NTIME = 1
-    logging.info("workerCount:%s" % id)
-    cur = datetime.now()
-    utime = int(time.mktime(cur.timetuple()))
-    tqueue = {}
-    while True:
-        try:
-            #if mainQueue.empty():
-            #    continue
-            message = mainQueue.get()
-            #message = mainQueue.get_nowait()
-            if not message:
-                continue 
-            logging.info("counter:get:%d" % len(message))
-            mainQueue.task_done()
-            cur1 = datetime.now()
-            utime1 = int(time.mktime(cur1.timetuple()))
-            do_count(tqueue, message)
-            if (utime1 - utime) > NTIME:
-                utime = utime1
-                logging.info("counter:flush:%d" % len(tqueue))
-                qtmp = tqueue.copy()
-                tqueue = {}
-                otherQueue.put(qtmp)
-                continue
+            logging("workerUpdateRedis:%d" % len(message))
+            do_count(rd, message)
+            queue.task_done()
         except Exception, err:
             pass
 
 
 
-#NTIME = 3
-#TCOUNT = 100
-def workerMain(id, mainQueue):
-    rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
-    NTIME = 1
+def workerMain(id, mainQueue, mainQueue1):
     logging.info("workerMain:%s" % id)
     cur = datetime.now()
     utime = int(time.mktime(cur.timetuple()))
     tqueue = []
     while True:
         try:
-            if mainQueue.empty():
-                continue
-            #message = mainQueue.get()
+            #if mainQueue.empty():
+            #    continue
             message = mainQueue.get_nowait()
             if not message:
                 continue
             pp = parser.parse_line(message)
             if not pp:
                 continue
+            #logging.info(pp)
             rhost = pp["remote_host"]
             if pp['http_host']:
                 cat = pp['http_host']
@@ -171,9 +122,6 @@ def workerMain(id, mainQueue):
             min5 = cur.minute - (cur.minute % 5);
             cur5 = cur.replace(minute=min5)
             localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
-            if not check_time1(localtime5):
-                continue
-
 
             tqueue.append({
                 "type": "rhost_request_count_%s|%s" % (str(pp["status"]), str(rhost)),
@@ -206,61 +154,40 @@ def workerMain(id, mainQueue):
             cur1 = datetime.now()
             utime1 = int(time.mktime(cur1.timetuple()))
             if (utime1 - utime) > NTIME:
+            #if (utime1 - utime) > NTIME or len(tqueue) >= TCOUNT:
                 utime = utime1
-                qtmp = tqueue[:]
+                qtmp= tqueue[:]
                 tqueue[:] = []
-                logging.info("main:flush:%d" % len(qtmp))
-		do_count1(rd, qtmp)
+                mainQueue1.put(qtmp)
+                #cache_val = {}
             mainQueue.task_done()
         except Exception, err:
+            #logging.info(err)
             pass 
 
-
-POOL = []
-POOL_INIT = 1
-POOL_COUNTER = []
-POOL_COUNTER_INIT = 1
-POOL_FLUSH = []
-POOL_FLUSH_INIT = 1
-
-def create_thread(pool, func, q):
-    i = len(pool) + 1
-    #t = Thread(target=func, name='q_msg_%d' % i,args=(i, q))
-    t = multiprocessing.Process(target=func, name='q_msg_%d' % i,args=(i, q))
-    pool.append(t)
+def create_thread():
+    i = len(POOL) + 1
+    t = Thread(target=workerMain, name='queue_%d' % i,args=(i, q_msg, q_redis_msg))
+    POOL.append(t)
     t.daemon = True
     t.start()
 
-for i in range(POOL_INIT):
-    create_thread(POOL, workerMain, q_msg )
-#for i in range(POOL_COUNTER_INIT):
-#    create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
-#for i in range(POOL_FLUSH_INIT):
-#    create_thread(POOL_FLUSH, workerFlush, q_flush, None)
 
+def create_thread1():
+    i = len(POOL_REDIS) + 1
+    t = Thread(target=workerUpdateRedis, name='queue_%d' % i,args=(i, q_redis_msg))
+    POOL_REDIS.append(t)
+    t.daemon = True
+    t.start()
 
-def check_counter(POOL, q_msg ):
-    while True:
-        time.sleep(3)
-        qs = q_msg.qsize()
-#        qs1 = q_counter.qsize()
-#        qs2 = q_flush.qsize()
-        if qs > 10:
-            create_thread(POOL, workerMain, q_msg)
-#        if qs1 > 3:
-#           create_thread(POOL_COUNTER, workerCounter, q_counter, q_flush)
-#        if qs2 > 3:
-#           create_thread(POOL_FLUSH, workerFlush, q_flush, None)
+for i in range(NPIPE_INIT):
+    create_thread()
 
-        logging.info("qsize:%d nworker:%d" % (qs, len(POOL)))
-#        logging.info("q_counter_size:%d nworker:%d" % (qs1, len(POOL_COUNTER)))
-#        logging.info("q_flush_size:%d nworker:%d" % (qs2, len(POOL_FLUSH)))
-t = Thread(target=check_counter, name='' ,args=(POOL, q_msg ))
-#t = Thread(target=check_counter, name='' ,args=(POOL, POOL_COUNTER, POOL_FLUSH, q_msg, q_counter, q_flush))
-t.daemon = True
-t.start()
+for i in range(NPIPE_INIT_REDIS):
+    create_thread1()
 
-
+cur0 = datetime.now()
+utime0 = int(time.mktime(cur0.timetuple()))
 while True:
     try:
         message = sys.stdin.readline()
@@ -270,7 +197,19 @@ while True:
         #q_msg.put(message)
         q_msg.put_nowait(message)
 
+        cur1 = datetime.now()
+        utime1 = int(time.mktime(cur1.timetuple()))
+        if utime1 - utime0 > 3:
+            qs = q_msg.qsize()
+            qs1 = q_redis_msg.qsize()
+
+            if qs > 10:
+                create_thread(POOL, q_msg, q_redis_msg, workerMain)
+            if qs1 > 3:
+                create_thread1(POOL_REDIS, q_redis_msg, workerUpdateRedis)
+            logging.info("qsize:%d nworker:%d qrsize:%s nworker:%d" % (qs, len(POOL), qs1, len(POOL_REDIS)))
+            cur0 = datetime.now()
+            utime0 = int(time.mktime(cur0.timetuple()))
+
     except Exception, err:
-        #logging.info(err)
         pass
-t.join()

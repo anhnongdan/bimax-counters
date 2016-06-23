@@ -2,8 +2,6 @@
 import os
 import time
 
-# from threading import Thread
-# from Queue import Queue
 import sys, time
 import logging
 logging.basicConfig(filename='/tmp/counters.log',level=logging.DEBUG)
@@ -34,8 +32,6 @@ def load_datetime(value, format):
 
 def dump_datetime(value, format):
     return value.strftime(format)
-#vnpt-hni-14 - - [meta sequenceId="49552677"] nginx:
-#parser = NginxLogParser('$request_time $remote_addr $sent_http_x_cache [$time_local] ' + \
 parser = NginxLogParser('$remote_host - - [$seq_id] nginx: $request_time $remote_addr $sent_http_x_cache [$time_local] ' + \
 			'"$request" $http_host $status $body_bytes_sent ' + \
 			'"$http_referer" "$http_user_agent" "$http_range"')
@@ -47,43 +43,33 @@ def do_flush(rd, cache_val):
     for kk in cache_val:
          vv = float(cache_val[kk])
          type,name = kk.split("###")
-         if check_time1(name):
-             pp.hincrbyfloat(type, name, vv)
+    #     if check_time1(name):
+         pp.hincrbyfloat(type, name, vv)
     pp.execute()
 
 
-def do_count1(rd, tqueue):
-    cache_val = {}
+def do_count(cache_val, tqueue):
     for tval in tqueue:
         kk = "%s###%s" %(tval['type'], tval['name'])
         if kk in cache_val:
             cache_val[kk] = cache_val[kk] + float(tval['val'])
         else:
             cache_val[kk] = float(tval['val'])
-    logging.info("short:%d" % len(cache_val))
-    do_flush(rd, cache_val)
 
-def process(tqueue, message):
+def process(cache_val, message):
+    tqueue = []
     if not message:
         return None
     pp = parser.parse_line(message)
     if not pp:
         return None
     rhost = pp["remote_host"]
-    if pp['http_host']:
-        cat = pp['http_host']
-    else:
-        cat = category
-
+    cat = pp['http_host']
     if pp['time_local'] is None or pp['status'] is None or pp['body_bytes_sent'] is None or pp['request_time'] is None:
         return None
 
     cur = load_datetime(pp['time_local'], '%d/%b/%Y:%H:%M:%S %z')
-    localtime = dump_datetime(cur, "%Y%m%d%H%M%z")
-    min5 = cur.minute - (cur.minute % 5);
-    cur5 = cur.replace(minute=min5)
-    localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
-
+    localtime5 = dump_datetime(cur, "%Y%m%d%H%M%z")
 
     tqueue.append({
         "type": "rhost_request_count_%s|%s" % (str(pp["status"]), str(rhost)),
@@ -112,8 +98,13 @@ def process(tqueue, message):
                 "type": "request_count_2xx|%s" % str(cat),
                 "name":localtime5,
                 "val":1})
+    do_count(cache_val, tqueue) 
 
+   
 if __name__ == "__main__":
-    with open("/data/logs/2016/06/23/track-2016-06-23-14-05-2.log", "r") as f:
+    ff = sys.argv[1]
+    cache_val = {}
+    with open(ff, "r") as f:
         for line in f:
-            print line
+            process(cache_val,line)
+        do_flush(rd, cache_val)

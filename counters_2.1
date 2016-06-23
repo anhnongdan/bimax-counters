@@ -3,14 +3,12 @@ import multiprocessing
 import os
 import time
 
-the_queue = multiprocessing.Queue()
-mainQueue = multiprocessing.Queue()
 
 from threading import Thread
 from Queue import Queue
 import sys, time
 import logging
-logging.basicConfig(filename='/tmp/scribe_pipe.log',level=logging.DEBUG)
+logging.basicConfig(filename='/data/logs/counters.log',level=logging.DEBUG)
 
 from nginx_log_parser import NginxLogParser
 from dateutil.parser import parse
@@ -49,13 +47,14 @@ import redis
 NTIME = 1
 #GLOBALLOCK = multiprocessing.Lock()
 
-num_worker_process = 32
-num_worker_main = 16
+num_worker_process = 128
+num_worker_main = 64
 # t_timeout = 10
 tcount = 100000
 tqueue = []
 
 def check_time1(atime):
+    #return True
     cur = datetime.now()
     min5 = cur.minute - (cur.minute % 5);
     cur5 = cur.replace(minute=min5)
@@ -66,6 +65,7 @@ def check_time1(atime):
     return True
 
 def check_time(tqueue1):
+    #return True
     cur = datetime.now()
     min5 = cur.minute - (cur.minute % 5);
     cur5 = cur.replace(minute=min5)
@@ -161,9 +161,9 @@ def workerMain(mainQueue, the_queue):
             min5 = cur.minute - (cur.minute % 5);
             cur5 = cur.replace(minute=min5)
             localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
-            if not check_time1(localtime5):
+            #if not check_time1(localtime5):
 #                logging.info("flush: onreal:%s" % localtime5)
-                continue
+            #    continue
 
             tqueue.append({
                 "type": "rhost_request_count_%s|%s" % (str(pp["status"]), str(rhost)),
@@ -209,6 +209,8 @@ def workerMain(mainQueue, the_queue):
             continue
 
 
+the_queue = multiprocessing.Queue()
+mainQueue = multiprocessing.Queue()
 the_pool = multiprocessing.Pool(num_worker_process, worker,(the_queue,))
 mainPool = multiprocessing.Pool(num_worker_main, workerMain,(mainQueue, the_queue,))
 
@@ -220,7 +222,7 @@ while True:
         if not message:
             continue
 	#logging.info(message)
-        mainQueue.put(message)
+        mainQueue.put_nowait(message)
     except Exception, err:
         logging.info(err)
         continue

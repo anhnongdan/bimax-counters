@@ -1,0 +1,9 @@
+#!/bin/sh
+rd="/usr/bin/redis-cli -s /tmp/redis.sock"
+val="`echo get CCU | $rd`"
+if [ -z "$val" ];then
+	val=0
+fi
+
+echo "0 ccu_vnpt ccu=$val ccu=$val"
+
