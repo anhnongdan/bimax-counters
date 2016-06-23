@@ -2,8 +2,8 @@
 import os
 import time
 
-from threading import Thread
-from Queue import Queue
+# from threading import Thread
+# from Queue import Queue
 import sys, time
 import logging
 logging.basicConfig(filename='/tmp/counters.log',level=logging.DEBUG)
