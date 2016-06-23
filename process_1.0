@@ -65,10 +65,10 @@ def do_count1(rd, tqueue):
 
 def process(tqueue, message):
     if not message:
-        continue
+        return None
     pp = parser.parse_line(message)
     if not pp:
-        continue
+        return None
     rhost = pp["remote_host"]
     if pp['http_host']:
         cat = pp['http_host']
@@ -76,15 +76,13 @@ def process(tqueue, message):
         cat = category
 
     if pp['time_local'] is None or pp['status'] is None or pp['body_bytes_sent'] is None or pp['request_time'] is None:
-        continue
+        return None
 
     cur = load_datetime(pp['time_local'], '%d/%b/%Y:%H:%M:%S %z')
     localtime = dump_datetime(cur, "%Y%m%d%H%M%z")
     min5 = cur.minute - (cur.minute % 5);
     cur5 = cur.replace(minute=min5)
     localtime5 = dump_datetime(cur5, "5:%Y%m%d%H%M%z")
-    if not check_time1(localtime5):
-        continue
 
 
     tqueue.append({
