@@ -1,21 +1,7 @@
 #!/bin/sh
 log=/tmp/aa.log
-#ohn=`date +'%Y%m%d%H' --date='10 minutes ago'`
-#omn=`date +%M --date='10 minutes ago'`
-#omn5="`echo $omn - ${omn}%5 | bc`"
-#if [ $omn5 -lt 10 ];then
-#        omn5=0$omn5
-#fi
-#omin="${ohn}${omn5}+0700"
-omin=`date +'%Y%m%d%H%M+0700' --date='1 minute ago'`
-#hn=`date +'%Y%m%d%H' --date='5 minutes ago'`
-#mn=`date +%M --date='5 minutes ago'`
-#mn5="`echo $mn - ${mn}%5 | bc`"
-#if [ $mn5 -lt 10 ];then
-#        mn5=0$mn5
-#fi
-#min="${hn}${mn5}+0700"
-min=`date +'%Y%m%d%H%M+0700'`
+omin=`date +'%Y%m%d%H%M+0700' --date='2 minutes ago'`
+min=`date +'%Y%m%d%H%M+0700' --date='1 minute ago'`
 kkn=60
 svrs="xmiolive.e14538a7.viettel-cdn.vn vod1.clipzone.vn"
 redis="/usr/bin/redis-cli -s /tmp/redis.sock -n 0"

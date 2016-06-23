@@ -1,7 +1,7 @@
 #!/bin/sh
 log=/tmp/aa.log
-omin=`date +'%Y%m%d%H%M+0700' --date='1 minute ago'`
-min=`date +'%Y%m%d%H%M+0700'`
+omin=`date +'%Y%m%d%H%M+0700' --date='2 minute ago'`
+min=`date +'%Y%m%d%H%M+0700' --date='1 minute ago'`
 kkn=60
 
 svrs="xmiolive.e14538a7.viettel-cdn.vn vod1.clipzone.vn"
