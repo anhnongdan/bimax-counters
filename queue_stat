@@ -1,3 +1,5 @@
 #!/bin/sh
+> /tmp/queue_status.log
+sleep 3
 tail -1 /tmp/queue_status.log | awk '/workers a/{n=split($2,nn,"+");printf("0 queue_stat queue=%d|total_wrk=%d|cur_wrk=%d queue=%d total_wrk=%d cur_wrk=%d\n", $1, n, $13,$1, n, $13);}'
 
