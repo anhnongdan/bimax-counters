@@ -1,9 +1,10 @@
 #!/bin/sh
 log=/var/log/process_queue_piwik_real.log
-rd="/usr/bin/redis-cli -s /tmp/redis_counters.sock"
+conf=/mnt/app/bimax-counters/bi.conf
+queue_host=`awk -F'=' '/piwik_queue_real_host=/ {print $2}' $conf | head -1`
+rd="/usr/bin/redis-cli $queue_host"
 proc="/usr/bin/python /mnt/app/bimax-counters/queue_piwik_1.0"
 
-conf=/mnt/app/bimax-counters/bi.conf
 
 tmp=`mktemp`
 tmpd=`mktemp -d`	
