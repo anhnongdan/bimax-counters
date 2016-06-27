@@ -108,7 +108,7 @@ def process_message(pp):
         "date": localtime})
 
 
-commandline = '/mnt/app/bimax_analytics/piwik_pipe.sh'
+commandline = '/mnt/app/bimax-counters/piwik_pipe.sh'
 
 if __name__ == "__main__":
     ff = sys.argv[1]
