@@ -1,10 +1,14 @@
 #!/bin/sh
 log=/var/log/process_queue_piwik_nreal.log
-rd="/usr/bin/redis-cli -s /tmp/redis_counters.sock"
+qinfo=/usr/lib/check_mk_agent/update.info
+conf=/mnt/app/bimax-counters/bi.conf
+
+queue_host=`awk -F'=' '/piwik_queue_nreal_host=/ {print $2}' $conf | head -1`
+rd="/usr/bin/redis-cli $queue_host"
+
+
 proc="/usr/bin/python /mnt/app/bimax-counters/queue_piwik_1.0"
 
-conf=/mnt/app/bimax-counters/bi.conf
-qinfo=/usr/lib/check_mk_agent/update.info
 tmp=`mktemp`
 tmpd=`mktemp -d`	
 while true;do
