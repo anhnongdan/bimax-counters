@@ -1,0 +1,3 @@
+#!/bin/sh
+log=/usr/lib/check_mk_agent/update.info
+cat $log
