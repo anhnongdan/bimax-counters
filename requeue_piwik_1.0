@@ -49,6 +49,7 @@ h_k2 = re.compile("\:\d+")
 
 
 cdn_gg0 = re.compile("^.*(vtvgoeuro).*$")
+#cdn_gg0 = re.compile("^.*(vtvgoeuro).*$")
 
 
 

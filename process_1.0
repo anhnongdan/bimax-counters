@@ -36,7 +36,7 @@ parser = NginxLogParser('$remote_host - - [$seq_id] nginx: $request_time $remote
 			'"$request" $http_host $status $body_bytes_sent ' + \
 			'"$http_referer" "$http_user_agent" "$http_range"')
 import redis
-rd = redis.Redis(unix_socket_path='/tmp/redis.sock', db=0)
+rd = redis.Redis(unix_socket_path='/tmp/redis_counters.sock', db=0)
 
 def do_flush(rd, cache_val):
     pp = rd.pipeline()
