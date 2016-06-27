@@ -1,8 +1,11 @@
 #!/bin/sh
 log=/var/log/process_process_file.log
-rd="/usr/bin/redis-cli -s /tmp/redis_counters.sock"
-proc="/usr/bin/python /mnt/app/bimax-counters/process_1.0"
 conf=/mnt/app/bimax-counters/bi.conf
+
+queue_host=`awk -F'=' '/process_queue_host=/ {print $2}' $conf | head -1`
+rd="/usr/bin/redis-cli $queue_host"
+
+proc="/usr/bin/python /mnt/app/bimax-counters/process_1.0"
 tmp=`mktemp`
 tmpd=`mktemp -d`
 while true;do

@@ -1,6 +1,7 @@
 #!/bin/sh
-rd="/usr/bin/redis-cli -s /tmp/redis_counters.sock"
 conf=/mnt/app/bimax-counters/bi.conf
+queue_host=`awk -F'=' '/monitor_queue_host=/ {print $2}' $conf | head -1`
+rd="/usr/bin/redis-cli $queue_host"
 
 /usr/bin/inotifywait -r -m /data/logs --format "%w%f" -e create | while read f;do
         requeue_list=`awk -F'=' '/monitor_queue_list=/ {print $2}' $conf | head -1`
