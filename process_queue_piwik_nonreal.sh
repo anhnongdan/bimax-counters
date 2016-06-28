@@ -20,6 +20,7 @@ while true;do
 	qlimit=`awk -F'=' '/piwik_queue_nreal_qlimit=/ {print $2}' $conf | head -1`
 	nq="`awk -F'|' '/queue_stat/ {sub(/^.*=/,"",$1);print $1}' $qinfo`"
 	while [ $nq -gt $qlimit ];do
+		echo "`date`: reach limit $qlimit wait for release queue:$nq" >> $log
 		sleep 10
 		nq="`awk -F'|' '/queue_stat/ {sub(/^.*=/,"",$1);print $1}' $qinfo`"
 	done
