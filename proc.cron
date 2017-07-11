@@ -1,3 +1,0 @@
-* * * * * /root/bimax-counters/agent/update_info.sh
-* * * * * sleep 20 && /root/bimax-counters/agent/update_info.sh
-* * * * * sleep 40 && /root/bimax-counters/agent/update_info.sh
