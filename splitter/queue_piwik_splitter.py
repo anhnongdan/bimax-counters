@@ -12,6 +12,10 @@ from pytz import timezone, utc
 from pytz.tzinfo import StaticTzInfo
 from shlex import split
 
+#[Thangnt] Spliter has the role to split the log on /data/logs into separated domains
+#it doesn't change anything in the log, just parse the time to create files.
+#Log processing (i.e hls, dash token generalizing, filter, etc.) is now the role 
+#of extractor - see extract/queue_piwik_2.1 
 
 class OffsetTime(StaticTzInfo):
     def __init__(self, offset):
@@ -49,12 +53,31 @@ if __name__ == "__main__":
 		    if not msgp or msgp is None:
 			continue
                     host = msgp['http_host'].strip()
-                    cur = load_datetime(msgp['time_local'], '%d/%b/%Y:%H:%M:%S %z')
-                    dir1 = dump_datetime(cur, '%Y/%m/%d')
-                    dir2 = dump_datetime(cur, '%Y_%m_%d_%H_%M')
+                    
+		    #[Thangnt] Splitter must follow the time on log to write to 
+		    #the designated files. This make the whole system is very vulnerable
+		    #to the input time inaccuracy.
+		    #It's ok to let Splitter use local host time rather than rely on the
+		    #input log. Now both syslog-ng and Splitter use local time to process
+		    #log, if an Edge Server send out old log, it just goes through Log 
+		    #Controller and goes to PW DB.
+		    # https://github.com/anhnongdan/bimax-counters/issues/2
+		    
+		    #cur1 = load_datetime(msgp['time_local'], '%d/%b/%Y:%H:%M:%S %z')
+		    #cur = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		    #print cur	    
+		    #print 1
+			
+		    #dir1 = dump_datetime(cur, '%Y/%m/%d')
+                    #dir2 = dump_datetime(cur, '%Y_%m_%d_%H_%M')
+		    dir1 = datetime.now().strftime("%Y/%m/%d")
+		    dir2 = datetime.now().strftime("%Y_%m_%d_%H_%M")
+		    #print dir1
+		    #print dir2
+		
                     mydir = "%s/%s/%s" % (logdir, host, dir1)
                     if not os.path.exists(mydir):
-                        os.makedirs(mydir, 0755)
+                         os.makedirs(mydir, 0755)
                     fd_name = "%s/%s_%s" % (mydir, host, dir2)
                     if fd_name not in fds:
                         fd = open(fd_name, 'a')
