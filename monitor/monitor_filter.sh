@@ -33,14 +33,18 @@ rd="/usr/bin/redis-cli $queue_host"
 	        requeue_state=`awk -F'=' '/filter_queue_state=/ {print $2}' $conf | head -1`
 	done
 
+	domain=`echo "$f" | awk -F '/' '{print $4}'`
+        last=`echo "rpop $domain" | $rd`
 
-	if [ -z "$last" ];then
-		last="$f"
-	else
+        if [ -z "$last" ];then
+                echo "rpush $domain $f" | $rd
+        else
 		echo "`date`:$last" >> $log
 		for qq in $requeue_list;do
 			echo "rpush $qq $last" | $rd
 		done
-		last="$f"
-	fi
+		#last="$f"
+                echo "rpush $domain $f" | $rd
+        fi
+
 done
