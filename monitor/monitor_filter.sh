@@ -1,6 +1,7 @@
 #!/bin/sh
 sysctl fs.inotify.max_user_watches=65565
-conf=/mnt/app/bimax-counters/monitor/bi_filter.conf
+MYDIR="$(dirname "$(realpath "$0")")"
+conf=$MYDIR/bi_filter.conf
 queue_host=`awk -F'=' '/filter_queue_host=/ {print $2}' $conf | head -1`
 rd="/usr/bin/redis-cli $queue_host"
 

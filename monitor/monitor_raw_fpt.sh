@@ -5,7 +5,7 @@ conf=$MYDIR/bi_monitor_raw.conf
 queue_host=`awk -F'=' '/monitor_queue_host=/ {print $2}' $conf | head -1`
 rd="/usr/bin/redis-cli $queue_host"
 
-/usr/bin/inotifywait -r -m /data/logs --format "%w%f" -e create | while read f;do
+/usr/bin/inotifywait -r -m /data/logs_fpt --format "%w%f" -e create | while read f;do
 	if [ -z "$f" ];then continue; fi
         if [ ! -f "$f" ];then continue; fi
 

@@ -1,6 +1,7 @@
 #!/bin/sh
-conf=/mnt/app/bimax-counters/splitter/bi_splitter_0.conf
-proc="/mnt/app/bimax-counters/splitter/queue_piwik_splitter.py"
+MYDIR="$(dirname "$(realpath "$0")")"
+conf=$MYDIR/bi_splitter_0.conf
+proc="$MYDIR/queue_piwik_splitter.py"
 
 tmp=`mktemp`
 tmpd=`mktemp -d`	

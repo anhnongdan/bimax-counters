@@ -1,12 +1,13 @@
 #!/bin/sh
 #log=/var/log/process_process_file.log
 #log=/dev/null
-conf=/mnt/app/bimax-counters/counters/bi_counters.conf
+MYDIR="$(dirname "$(realpath "$0")")"
+conf=$MYDIR/bi_counters.conf
 
 queue_host=`awk -F'=' '/process_queue_host=/ {print $2}' $conf | head -1`
 rd="/usr/bin/redis-cli $queue_host"
 
-proc="/usr/bin/python /mnt/app/bimax-counters/counters/process_1.4"
+proc="/usr/bin/python $MYDIR/process_1.4"
 tmp=`mktemp`
 tmpd=`mktemp -d`
 while true;do
