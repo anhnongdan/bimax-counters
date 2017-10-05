@@ -5,7 +5,7 @@
 
 # Requirements:
 # - HAproxy socket
-#   (config: "stats socket /var/run/haproxy.socket")
+   (config: "stats socket /var/lib/haproxy/stats")
 
 import os
 import re
@@ -142,7 +142,7 @@ class HAProxyStats(object):
 
 if __name__ == "__main__":
 
-    socketfile = "/var/run/haproxy.socket"
+    socketfile = "/var/lib/haproxy/stats"
 
     if not os.path.exists(socketfile):
             print "Socket does not exist"
