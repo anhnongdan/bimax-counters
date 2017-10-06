@@ -1,8 +1,9 @@
 #!/bin/sh
 port=$1
-dir=/data/app/bimax-counters/extract
-conf=$dir/bi_extract.conf
-proc="/usr/bin/python $dir/queue_piwik_2.1"
+MYDIR="$(dirname "$(realpath "$0")")"
+conf=$MYDIR/bi_extract.conf
+proc="/usr/bin/python $MYDIR/queue_piwik_2.1"
+resolver=$MYDIR/log_resolver.sh
 
 tmp=`mktemp`
 tmpd=`mktemp -d`	
@@ -47,8 +48,11 @@ while true;do
 		if [ $ll -eq 0 ];then
 			continue
 		fi
-		cd $tmpd
-		split -l $ll $f	
+		cd $tmpda
+
+		# ha implementation: resolve $ll to backup when master NFS down
+		f_available=`$resolver $f`
+		split -l $ll $f_available
 		> $tmp
 		find $tmpd -type f | while read ff;do
 			echo $proc $ff $id $host >> $tmp
