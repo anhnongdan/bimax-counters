@@ -5,7 +5,7 @@
 
 # Requirements:
 # - HAproxy socket
-   (config: "stats socket /var/lib/haproxy/stats")
+#   (config: "stats socket /var/lib/haproxy/stats")
 
 import os
 import re
@@ -152,5 +152,5 @@ if __name__ == "__main__":
     stats = statssocket.getstats()
 
     from haproxychecks import checks
-
+    print "<<<local>>>"
     run_checks(stats)
