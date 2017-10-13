@@ -14,6 +14,7 @@ while true;do
 	queue=${queue0}$port	
 	queue_next=${queue1}$port	
 	log=`awk -F'=' '/piwik_queue_real_log=/ {print $2}' $conf | head -1`
+	log="${log}_$port"
 	queue_host=`awk -F'=' '/piwik_queue_real_host=/ {print $2}' $conf | head -1`
 	rd="/usr/bin/redis-cli $queue_host"
         filters=`cat $conf | grep "piwik_queue_real_filter_$port" | cut -d'=' -f2 | head -1`
@@ -48,7 +49,7 @@ while true;do
 		if [ $ll -eq 0 ];then
 			continue
 		fi
-		cd $tmpda
+		cd $tmpd
 
 		# ha implementation: resolve $ll to backup when master NFS down
 		f_available=`$resolver $f`
